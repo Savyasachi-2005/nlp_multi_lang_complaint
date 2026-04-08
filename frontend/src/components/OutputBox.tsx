@@ -13,7 +13,8 @@ type ParsedComplaint = {
 };
 
 const FONT_URLS = {
-  notoSans: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+  notoSans:
+    "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
   notoSansKannada:
     "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansKannada/NotoSansKannada-Regular.ttf",
   notoSansDevanagari:
@@ -47,7 +48,10 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function loadFontBase64(url: string, key: keyof typeof FONT_CACHE): Promise<string> {
+async function loadFontBase64(
+  url: string,
+  key: keyof typeof FONT_CACHE,
+): Promise<string> {
   if (FONT_CACHE[key]) {
     return FONT_CACHE[key] as string;
   }
@@ -65,16 +69,26 @@ async function loadFontBase64(url: string, key: keyof typeof FONT_CACHE): Promis
 
 async function registerUnicodeFont(doc: jsPDF, text: string): Promise<string> {
   if (hasKannada(text)) {
-    const base64 = await loadFontBase64(FONT_URLS.notoSansKannada, "notoSansKannada");
+    const base64 = await loadFontBase64(
+      FONT_URLS.notoSansKannada,
+      "notoSansKannada",
+    );
     doc.addFileToVFS("NotoSansKannada-Regular.ttf", base64);
     doc.addFont("NotoSansKannada-Regular.ttf", "NotoSansKannada", "normal");
     return "NotoSansKannada";
   }
 
   if (hasDevanagari(text)) {
-    const base64 = await loadFontBase64(FONT_URLS.notoSansDevanagari, "notoSansDevanagari");
+    const base64 = await loadFontBase64(
+      FONT_URLS.notoSansDevanagari,
+      "notoSansDevanagari",
+    );
     doc.addFileToVFS("NotoSansDevanagari-Regular.ttf", base64);
-    doc.addFont("NotoSansDevanagari-Regular.ttf", "NotoSansDevanagari", "normal");
+    doc.addFont(
+      "NotoSansDevanagari-Regular.ttf",
+      "NotoSansDevanagari",
+      "normal",
+    );
     return "NotoSansDevanagari";
   }
 
@@ -94,7 +108,10 @@ function cleanComplaintText(rawText: string): string {
   const dedupedLines: string[] = [];
   for (const line of compactedSpaces.split("\n")) {
     if (!line) {
-      if (dedupedLines.length === 0 || dedupedLines[dedupedLines.length - 1] === "") {
+      if (
+        dedupedLines.length === 0 ||
+        dedupedLines[dedupedLines.length - 1] === ""
+      ) {
         continue;
       }
       dedupedLines.push("");
@@ -106,7 +123,10 @@ function cleanComplaintText(rawText: string): string {
     }
   }
 
-  return dedupedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return dedupedLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function parseComplaintText(output: ComplaintResponse): ParsedComplaint {
@@ -180,7 +200,8 @@ export default function OutputBox({ output, error }: OutputBoxProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const parsed = output ? parseComplaintText(output) : null;
   const formattedComplaint = parsed ? buildFormattedComplaint(parsed) : "";
-  const hasDownloadContent = Boolean(formattedComplaint.trim().length > 0) && !isDownloading;
+  const hasDownloadContent =
+    Boolean(formattedComplaint.trim().length > 0) && !isDownloading;
 
   const handleDownload = async () => {
     if (!hasDownloadContent) {
@@ -198,48 +219,63 @@ export default function OutputBox({ output, error }: OutputBoxProps) {
   };
 
   return (
-    <div className="rounded-2xl bg-gray-800/80 p-6 shadow-card ring-1 ring-gray-700">
+    <div className="glass-card rounded-3xl p-6 md:p-7">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-white">Processed Output</h2>
+        <div>
+          <h2 className="text-2xl font-semibold text-[#ebfffa]">
+            Processed Output
+          </h2>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#89b8b1]">
+            Result Panel
+          </p>
+        </div>
         <button
           type="button"
           onClick={handleDownload}
           disabled={!hasDownloadContent}
-          className="rounded-lg bg-gray-700 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl border border-teal-200/30 bg-teal-300/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-teal-50 transition hover:bg-teal-300/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {isDownloading ? "Preparing PDF..." : "Download PDF"}
         </button>
       </div>
 
       {!output && !error && (
-        <p className="mt-3 text-sm text-gray-400">
-          Submit a complaint to view detected language, complaint type, location, and final translated complaint.
+        <p className="mt-5 rounded-2xl border border-dashed border-teal-100/25 bg-[#07171f]/80 p-4 text-sm leading-relaxed text-[#a8c7c2]">
+          Submit a complaint to view detected language, complaint type,
+          location, and final translated complaint.
         </p>
       )}
 
       {error && (
-        <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="mt-5 rounded-2xl border border-red-300/40 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
       )}
 
       {output && parsed && (
-        <div className="mt-4 space-y-3 text-sm text-gray-200">
-          <p>
-            <span className="font-semibold text-gray-100">Detected Language:</span>{" "}
-            {output.detected_language}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-100">Complaint Type:</span>{" "}
-            {output.complaint_type}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-100">Location:</span> {output.location}
-          </p>
+        <div className="mt-5 space-y-4 text-sm text-[#dbf3ef]">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full border border-teal-200/35 bg-teal-300/15 px-3 py-1">
+              Language: {output.detected_language}
+            </span>
+            <span className="rounded-full border border-amber-200/35 bg-amber-200/10 px-3 py-1 text-amber-50">
+              Type: {output.complaint_type}
+            </span>
+            <span className="rounded-full border border-sky-200/35 bg-sky-200/10 px-3 py-1 text-sky-50">
+              Location: {output.location}
+            </span>
+          </div>
 
-          <div className="rounded-xl p-5 bg-gray-800 text-gray-100 ring-1 ring-gray-700">
-            <p className="text-base font-semibold leading-relaxed">{parsed.subject}</p>
-            <p className="mt-4 whitespace-pre-line leading-relaxed">{parsed.body}</p>
+          <div className="rounded-2xl border border-teal-100/20 bg-[#06161d] p-5">
+            <p className="text-xs uppercase tracking-[0.16em] text-[#7baaa3]">
+              Formatted Complaint
+            </p>
+            <p className="mt-3 text-base font-semibold leading-relaxed text-[#f0fffb]">
+              {parsed.subject}
+            </p>
+            <p className="mt-4 whitespace-pre-line leading-relaxed text-[#cbe4e0]">
+              {parsed.body}
+            </p>
           </div>
         </div>
       )}
