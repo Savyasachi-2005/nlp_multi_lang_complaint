@@ -2,11 +2,15 @@ from fastapi import APIRouter, HTTPException
 from httpx import HTTPStatusError
 
 try:
+    from app.services.classifier import get_classifier_metrics, get_trained_classifier
+    from app.services.preprocessing import preprocess_text
     from app.schemas.complaint import ComplaintRequest, ComplaintResponse
     from app.services.extractor import extract_complaint_details
     from app.services.formatter import format_complaint
     from app.services.sarvam import SarvamService
 except ModuleNotFoundError:
+    from services.classifier import get_classifier_metrics, get_trained_classifier
+    from services.preprocessing import preprocess_text
     from schemas.complaint import ComplaintRequest, ComplaintResponse
     from services.extractor import extract_complaint_details
     from services.formatter import format_complaint
@@ -14,6 +18,11 @@ except ModuleNotFoundError:
 
 router = APIRouter(tags=["complaints"])
 SUPPORTED_TARGET_LANGUAGES = {"hi", "kn", "ta", "te", "mr"}
+
+
+@router.get("/classifier-metrics")
+async def classifier_metrics() -> dict[str, float]:
+    return get_classifier_metrics()
 
 
 @router.post("/process-complaint", response_model=ComplaintResponse)
@@ -35,18 +44,37 @@ async def process_complaint(payload: ComplaintRequest) -> ComplaintResponse:
             target_language="en",
         )
 
+        processed = preprocess_text(english_text)
+        model_input_text = " ".join(processed.lemmatized_tokens) or english_text
+
+        # Explicit feature extraction step in the processing pipeline.
+        classifier_artifacts = get_trained_classifier()
+        classifier_artifacts.feature_engineer.transform([model_input_text])
+
         details = extract_complaint_details(english_text)
 
         structured_complaint = format_complaint(
             complaint_type=details["complaint_type"],
             location=details["location"],
+            complaint_text=english_text,
+            issue_verbs=details.get("issue_verbs", ""),
         )
 
-        final_output = await sarvam.translate_text(
-            structured_complaint,
-            source_language="en",
-            target_language=payload.target_language,
-        )
+        # Translate section-wise so line breaks survive and the result looks like a letter.
+        translated_sections: list[str] = []
+        for section in structured_complaint.split("\n"):
+            stripped = section.strip()
+            if not stripped:
+                continue
+            translated_sections.append(
+                await sarvam.translate_text(
+                    stripped,
+                    source_language="en",
+                    target_language=payload.target_language,
+                )
+            )
+
+        final_output = "\n\n".join(translated_sections)
 
         return ComplaintResponse(
             detected_language=detected_language,

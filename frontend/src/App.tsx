@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ComplaintForm from "./components/ComplaintForm";
 import OutputBox from "./components/OutputBox";
-import { processComplaint, type ComplaintResponse } from "./api";
+import {
+  getClassifierMetrics,
+  processComplaint,
+  type ClassifierMetrics,
+  type ComplaintResponse,
+} from "./api";
 
 export default function App() {
   const [complaintText, setComplaintText] = useState("");
@@ -11,6 +16,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<ComplaintResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<ClassifierMetrics | null>(null);
+
+  useEffect(() => {
+    getClassifierMetrics()
+      .then(setMetrics)
+      .catch(() => {
+        setMetrics(null);
+      });
+  }, []);
 
   const handleSubmit = async () => {
     if (!complaintText.trim()) {
@@ -56,7 +70,7 @@ export default function App() {
               Language Detection
             </span>
             <span className="rounded-full border border-teal-200/30 bg-teal-400/10 px-3 py-1">
-              Formal Draft Generation
+              Hybrid NLP Classification
             </span>
             <span className="rounded-full border border-teal-200/30 bg-teal-400/10 px-3 py-1">
               Unicode PDF Download
@@ -77,7 +91,7 @@ export default function App() {
           </div>
 
           <div className="section-appear-delay">
-            <OutputBox output={output} error={error} />
+            <OutputBox output={output} error={error} metrics={metrics} />
           </div>
         </section>
       </div>

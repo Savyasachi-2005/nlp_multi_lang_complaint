@@ -2,9 +2,9 @@
 
 ## 📌 Overview
 
-This project implements a multilingual NLP pipeline that accepts user complaints in any language and converts them into a structured, formal complaint in a selected regional language (Kannada or Hindi).
+This project implements a multilingual NLP pipeline that accepts user complaints in any language and converts them into a structured, formal complaint in a selected regional language.
 
-The system uses translation and basic NLP techniques to extract key information and generate a well-formatted complaint suitable for official use.
+The updated system now includes local, syllabus-aligned NLP components (preprocessing, feature engineering, classification, POS analysis, n-gram modeling, WordNet semantics, and evaluation), while using Sarvam AI only for translation.
 
 ---
 
@@ -23,9 +23,15 @@ The system uses translation and basic NLP techniques to extract key information 
 
 - Multilingual input support (English, Hindi, Kannada, mixed)
 - Automatic language detection
-- Translation using Sarvam AI API
-- Complaint type & location extraction
-- Structured complaint generation
+- Translation using Sarvam AI API (only translation stage)
+- Full NLP preprocessing (normalization, tokenization, stopwords, lemmatization)
+- Feature engineering using Bag-of-Words and TF-IDF
+- ML classification (Logistic Regression) with rule-based fallback
+- POS tagging for noun/verb linguistic cues
+- Bigram language model with add-one smoothing
+- WordNet-based semantic expansion and similarity
+- Evaluation metrics (accuracy, precision, recall)
+- Structured complaint generation without generation API dependency
 - Output in regional language (Kannada / Hindi)
 - PDF download of formatted complaint
 - Clean and minimal UI
@@ -42,10 +48,19 @@ project/
 │   │   └── complaint.py
 │   ├── schemas/
 │   │   └── complaint.py
+│   ├── data/
+│   │   └── complaint_dataset.csv
 │   └── services/
+│       ├── classifier.py
+│       ├── evaluation.py
 │       ├── extractor.py
+│       ├── features.py
 │       ├── formatter.py
+│       ├── ngram.py
+│       ├── pos_tagger.py
+│       ├── preprocessing.py
 │       └── sarvam.py
+│       └── wordnet_utils.py
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -70,7 +85,7 @@ project/
 
 ## 🔐 Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the `app/` directory:
 
 ```env
 SARVAM_API_KEY=your_api_key_here
@@ -155,15 +170,48 @@ User Input (any language)
         ↓
 Language Detection
         ↓
-Translation to English (pivot language)
+Translation to English (pivot language, Sarvam)
         ↓
-Complaint Detail Extraction (type + location)
+Preprocessing (normalize, tokenize, stopwords, lemmatize)
         ↓
-Structured Complaint Generation
+Feature Extraction (BoW + TF-IDF)
         ↓
-Translation to Target Regional Language
+Hybrid Classification (ML + Rule fallback)
+        ↓
+POS + Regex-based information extraction
+        ↓
+Template-based complaint formatter (+ n-gram enhancement)
+        ↓
+Translation to Target Regional Language (Sarvam)
         ↓
 PDF Download
+
+---
+
+## 📊 Classifier Metrics Endpoint
+
+### `GET /classifier-metrics`
+
+Returns current model evaluation metrics:
+
+- Accuracy
+- Precision (macro)
+- Recall (macro)
+
+---
+
+## 🧪 NLP Module to Syllabus Concept Mapping
+
+| Module | NLP Concept | Purpose in System |
+|-------|-------------|-------------------|
+| `preprocessing.py` | Text normalization, tokenization, stopword removal, lemmatization | Converts noisy complaint text into analyzable tokens |
+| `features.py` | BoW, TF-IDF vector space representation | Transforms text into ML-ready numeric features |
+| `classifier.py` | Supervised text classification (Logistic Regression) | Predicts complaint category |
+| `extractor.py` | Hybrid IE (regex + keywords + ML) | Extracts complaint type and location robustly |
+| `pos_tagger.py` | POS tagging | Uses nouns and verbs for location and action cues |
+| `ngram.py` | Bigram language model with add-one smoothing | Improves complaint sentence fluency |
+| `wordnet_utils.py` | Lexical semantics, synonym expansion, semantic similarity | Improves domain matching and fallback classification |
+| `evaluation.py` | Classification metrics | Quantifies model performance for academic reporting |
 ```
 
 ---

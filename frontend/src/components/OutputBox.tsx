@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { jsPDF } from "jspdf";
-import type { ComplaintResponse } from "../api";
+import type { ClassifierMetrics, ComplaintResponse } from "../api";
 
 type OutputBoxProps = {
   output: ComplaintResponse | null;
   error: string | null;
+  metrics: ClassifierMetrics | null;
 };
 
 type ParsedComplaint = {
@@ -75,6 +76,7 @@ async function registerUnicodeFont(doc: jsPDF, text: string): Promise<string> {
     );
     doc.addFileToVFS("NotoSansKannada-Regular.ttf", base64);
     doc.addFont("NotoSansKannada-Regular.ttf", "NotoSansKannada", "normal");
+    doc.addFont("NotoSansKannada-Regular.ttf", "NotoSansKannada", "bold");
     return "NotoSansKannada";
   }
 
@@ -89,42 +91,50 @@ async function registerUnicodeFont(doc: jsPDF, text: string): Promise<string> {
       "NotoSansDevanagari",
       "normal",
     );
+    doc.addFont(
+      "NotoSansDevanagari-Regular.ttf",
+      "NotoSansDevanagari",
+      "bold",
+    );
     return "NotoSansDevanagari";
   }
 
   const base64 = await loadFontBase64(FONT_URLS.notoSans, "notoSans");
   doc.addFileToVFS("NotoSans-Regular.ttf", base64);
   doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal");
+  doc.addFont("NotoSans-Regular.ttf", "NotoSans", "bold");
   return "NotoSans";
 }
 
-function cleanComplaintText(rawText: string): string {
-  const normalized = rawText.replace(/\r\n/g, "\n");
-  const compactedSpaces = normalized
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .join("\n");
-
-  const dedupedLines: string[] = [];
-  for (const line of compactedSpaces.split("\n")) {
-    if (!line) {
-      if (
-        dedupedLines.length === 0 ||
-        dedupedLines[dedupedLines.length - 1] === ""
-      ) {
-        continue;
-      }
-      dedupedLines.push("");
-      continue;
-    }
-
-    if (dedupedLines[dedupedLines.length - 1] !== line) {
-      dedupedLines.push(line);
-    }
+function parseSectionParagraph(
+  paragraph: string,
+): { heading: string; content: string } | null {
+  const trimmed = paragraph.trim();
+  if (!trimmed) {
+    return null;
   }
 
-  return dedupedLines
-    .join("\n")
+  const match = trimmed.match(/^([^:\n]{1,28}:)\s*(.*)$/u);
+  if (!match) {
+    return null;
+  }
+
+  const heading = match[1].trim();
+  const content = (match[2] || "").trim();
+  return { heading, content };
+}
+
+function cleanComplaintText(rawText: string): string {
+  return rawText
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function splitLongBlockToParagraphs(text: string): string {
+  return text
+    .replace(/([.!?\u0964])\s+/g, "$1\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -138,9 +148,25 @@ function parseComplaintText(output: ComplaintResponse): ParsedComplaint {
     };
   }
 
-  const lines = raw.split("\n").filter((line) => line.trim().length > 0);
-  const subject = lines[0] || `Subject: ${output.complaint_type} issue`;
-  const body = lines.slice(1).join("\n").trim();
+  const lines = raw.split("\n");
+  const firstContentIndex = lines.findIndex((line) => line.trim().length > 0);
+
+  if (firstContentIndex === -1) {
+    return {
+      subject: `Subject: ${output.complaint_type} issue`,
+      body: "",
+    };
+  }
+
+  let subject = lines[firstContentIndex].trim();
+  let body = lines.slice(firstContentIndex + 1).join("\n").trim();
+
+  // Fallback for providers that return a single long translated paragraph.
+  if (!body && subject.length > 120) {
+    body = splitLongBlockToParagraphs(subject);
+    subject = `Subject: ${output.complaint_type} complaint`;
+  }
+
   return { subject, body };
 }
 
@@ -163,9 +189,21 @@ async function downloadPDF(text: string): Promise<void> {
   const lineHeight = 18;
   let y = margin + 8;
 
-  const lines = cleaned.split("\n").filter((line) => line.trim().length > 0);
-  const subject = lines[0] || "Subject: Complaint";
-  const bodyText = lines.slice(1).join("\n").trim();
+  const lines = cleaned.split("\n");
+  const firstContentIndex = lines.findIndex((line) => line.trim().length > 0);
+  const subject =
+    firstContentIndex >= 0 ? lines[firstContentIndex].trim() : "Subject: Complaint";
+
+  const bodyText =
+    firstContentIndex >= 0
+      ? lines.slice(firstContentIndex + 1).join("\n").trim()
+      : "";
+
+  const paragraphs = bodyText
+    .split(/\n\s*\n/g)
+    .map((para) => para.trim())
+    .filter(Boolean);
+
   const fontName = await registerUnicodeFont(doc, cleaned);
 
   const addWrappedLines = (wrappedLines: string[]) => {
@@ -184,19 +222,50 @@ async function downloadPDF(text: string): Promise<void> {
   const subjectLines = doc.splitTextToSize(subject, maxWidth) as string[];
   addWrappedLines(subjectLines);
 
-  if (bodyText) {
-    y += 8;
+  if (paragraphs.length > 0) {
+    y += 12;
     doc.setFont(fontName, "normal");
     doc.setFontSize(12);
-    const bodyLines = doc.splitTextToSize(bodyText, maxWidth) as string[];
-    addWrappedLines(bodyLines);
+    for (const paragraph of paragraphs) {
+      const section = parseSectionParagraph(paragraph);
+
+      if (section) {
+        doc.setFont(fontName, "bold");
+        const headingLines = doc.splitTextToSize(section.heading, maxWidth) as string[];
+        addWrappedLines(headingLines);
+
+        if (section.content) {
+          y += 2;
+          doc.setFont(fontName, "normal");
+          const contentLines = doc.splitTextToSize(
+            section.content,
+            maxWidth - 10,
+          ) as string[];
+
+          for (const line of contentLines) {
+            if (y + lineHeight > pageHeight - margin) {
+              doc.addPage();
+              y = margin + 8;
+            }
+            doc.text(line, margin + 10, y, { align: "left" });
+            y += lineHeight;
+          }
+        }
+      } else {
+        doc.setFont(fontName, "normal");
+        const wrapped = doc.splitTextToSize(paragraph, maxWidth) as string[];
+        addWrappedLines(wrapped);
+      }
+
+      y += 10;
+    }
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   doc.save(`complaint_${timestamp}.pdf`);
 }
 
-export default function OutputBox({ output, error }: OutputBoxProps) {
+export default function OutputBox({ output, error, metrics }: OutputBoxProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const parsed = output ? parseComplaintText(output) : null;
   const formattedComplaint = parsed ? buildFormattedComplaint(parsed) : "";
@@ -241,9 +310,28 @@ export default function OutputBox({ output, error }: OutputBoxProps) {
 
       {!output && !error && (
         <p className="mt-5 rounded-2xl border border-dashed border-teal-100/25 bg-[#07171f]/80 p-4 text-sm leading-relaxed text-[#a8c7c2]">
-          Submit a complaint to view detected language, complaint type,
-          location, and final translated complaint.
+          Submit a complaint to view detected language, complaint category,
+          extracted location, and final translated complaint.
         </p>
+      )}
+
+      {metrics && (
+        <div className="mt-5 rounded-2xl border border-teal-100/20 bg-[#06161d] p-4 text-xs text-[#b5d9d3]">
+          <p className="uppercase tracking-[0.16em] text-[#7baaa3]">
+            Classifier Metrics
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-emerald-200/35 bg-emerald-300/10 px-3 py-1 text-emerald-100">
+              Accuracy: {metrics.accuracy.toFixed(2)}
+            </span>
+            <span className="rounded-full border border-cyan-200/35 bg-cyan-300/10 px-3 py-1 text-cyan-100">
+              Precision: {metrics.precision.toFixed(2)}
+            </span>
+            <span className="rounded-full border border-amber-200/35 bg-amber-300/10 px-3 py-1 text-amber-100">
+              Recall: {metrics.recall.toFixed(2)}
+            </span>
+          </div>
+        </div>
       )}
 
       {error && (

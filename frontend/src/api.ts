@@ -10,6 +10,12 @@ export type ComplaintResponse = {
   final_output: string;
 };
 
+export type ClassifierMetrics = {
+  accuracy: number;
+  precision: number;
+  recall: number;
+};
+
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ||
   "http://localhost:8000";
@@ -26,6 +32,17 @@ export async function processComplaint(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(err.detail || "Failed to process complaint");
+  }
+
+  return res.json();
+}
+
+export async function getClassifierMetrics(): Promise<ClassifierMetrics> {
+  const res = await fetch(`${API_BASE_URL}/classifier-metrics`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(err.detail || "Failed to fetch classifier metrics");
   }
 
   return res.json();

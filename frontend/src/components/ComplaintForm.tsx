@@ -28,7 +28,7 @@ export default function ComplaintForm({
           </p>
         </div>
         <span className="rounded-full border border-amber-200/35 bg-amber-200/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-100">
-          AI Assisted
+          NLP Pipeline
         </span>
       </div>
 
