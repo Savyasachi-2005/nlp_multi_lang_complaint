@@ -78,6 +78,7 @@ async def process_complaint(payload: ComplaintRequest) -> ComplaintResponse:
 
         return ComplaintResponse(
             detected_language=detected_language,
+            target_language=payload.target_language,
             complaint_type=details["complaint_type"],
             location=details["location"],
             final_output=final_output,

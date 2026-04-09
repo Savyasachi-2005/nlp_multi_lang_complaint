@@ -5,6 +5,7 @@ export type ComplaintRequest = {
 
 export type ComplaintResponse = {
   detected_language: string;
+  target_language: "hi" | "kn" | "ta" | "te" | "mr";
   complaint_type: string;
   location: string;
   final_output: string;

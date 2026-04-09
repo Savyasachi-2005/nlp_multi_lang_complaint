@@ -8,6 +8,7 @@ class ComplaintRequest(BaseModel):
 
 class ComplaintResponse(BaseModel):
     detected_language: str
+    target_language: str
     complaint_type: str
     location: str
     final_output: str

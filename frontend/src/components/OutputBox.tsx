@@ -129,13 +129,6 @@ function normalizeSubject(rawSubject: string, meta?: LetterMeta): string {
   return `${typePart}${locationPart}`;
 }
 
-function splitBodyParagraphs(body: string): string[] {
-  return body
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph.length > 0);
-}
-
 function formatLetterDate(date: Date): string {
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -459,7 +452,10 @@ export default function OutputBox({
             </summary>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-teal-200/35 bg-teal-300/15 px-3 py-1">
-                Language: {output.detected_language}
+                Input Detected: {output.detected_language}
+              </span>
+              <span className="rounded-full border border-fuchsia-200/35 bg-fuchsia-200/10 px-3 py-1 text-fuchsia-50">
+                Output Language: {output.target_language}
               </span>
               <span className="rounded-full border border-amber-200/35 bg-amber-200/10 px-3 py-1 text-amber-50">
                 Type: {output.complaint_type}
